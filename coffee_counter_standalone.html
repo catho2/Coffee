@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Coffee cost counter</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>☕</text></svg>">
+<style>
+:root{--bg:#faf7f2;--card:#fff;--text:#2b2118;--muted:#7a6a5c;--accent:#6f4e37;--accent-t:#fff;--line:#e6ddd2;--good:#2e7d32;--bad:#c62828;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c1612;--card:#2a211b;--text:#f3ebe3;--muted:#b3a291;--accent:#c89b7b;--accent-t:#1c1612;--line:#3d3027;--good:#81c784;--bad:#ef9a9a}}
+:root[data-theme="dark"]{--bg:#1c1612;--card:#2a211b;--text:#f3ebe3;--muted:#b3a291;--accent:#c89b7b;--accent-t:#1c1612;--line:#3d3027;--good:#81c784;--bad:#ef9a9a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.4}
+main{max-width:480px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:8px 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+.count{font-size:64px;font-weight:700;text-align:center;line-height:1}
+.sub{text-align:center;color:var(--muted);margin:4px 0 14px;font-size:14px}
+button{font:inherit;cursor:pointer}
+#add{width:100%;padding:22px;font-size:22px;font-weight:700;border:0;border-radius:14px;background:var(--accent);color:var(--accent-t)}
+#add:active{transform:scale(.98)}
+#bagbtn{width:100%;padding:14px;font-size:17px;font-weight:600;border:1px solid var(--accent);border-radius:12px;background:none;color:var(--accent);margin-bottom:8px}
+#undo,#bagundo{margin-top:10px;width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:none;color:var(--muted)}
+h2{font-size:15px;margin:0 0 10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+label{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid var(--line);font-size:15px}
+label:last-child{border-bottom:0}
+input{width:100px;font:inherit;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)}
+.row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);font-size:15px}
+.row:last-child{border-bottom:0}
+.row b{font-variant-numeric:tabular-nums}
+.neg{color:var(--bad)}.pos{color:var(--good)}
+#note{font-size:12px;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+<main>
+<h1>Coffee cost counter</h1>
+
+<div class="card">
+  <div class="count" id="total">0</div>
+  <div class="sub">coffees made with the machine</div>
+  <button id="add">+1 coffee</button>
+  <button id="undo">Undo last tap</button>
+</div>
+
+<div class="card">
+  <h2>Beans</h2>
+  <button id="bagbtn">Bought a bag</button>
+  <div class="row"><span>Bags bought</span><b id="b-n">0</b></div>
+  <div class="row"><span>Spent on beans</span><b id="b-spent">-</b></div>
+  <div class="row"><span>Beans left (estimate)</span><b id="b-left">-</b></div>
+  <button id="bagundo">Undo last bag</button>
+</div>
+
+<div class="card">
+  <h2>Results</h2>
+  <div class="row"><span>Cost per home coffee</span><b id="r-cpc">-</b></div>
+  <div class="row"><span>Beans per coffee</span><b id="r-beans">-</b></div>
+  <div class="row"><span>Machine per coffee</span><b id="r-mach">-</b></div>
+  <div class="row"><span>Saving per coffee</span><b id="r-save">-</b></div>
+  <div class="row"><span>Total spent so far</span><b id="r-spent">-</b></div>
+  <div class="row"><span>Total saved so far</span><b id="r-saved">-</b></div>
+  <div class="row"><span>Coffees to break even (% there)</span><b id="r-be">-</b></div>
+</div>
+
+<div class="card">
+  <h2>Inputs</h2>
+  <label>Coffee bought out ($)<input id="price" type="number" inputmode="decimal" step="any"></label>
+  <label>Machine cost ($)<input id="machine" type="number" inputmode="decimal" step="any"></label>
+  <label>Price of current bag ($)<input id="bag" type="number" inputmode="decimal" step="any"></label>
+  <label>Grams per bag<input id="grams" type="number" inputmode="decimal" step="any"></label>
+  <label>Grams per coffee<input id="per" type="number" inputmode="decimal" step="any"></label>
+  <label>Coffees made before (machine cost only)<input id="before" type="number" inputmode="numeric" step="1"></label>
+</div>
+<div id="note"></div>
+</main>
+
+<script>
+const defaults={price:5,machine:600,bag:25,grams:1000,per:18,before:0,count:0,bags:[]};
+let s={...defaults};
+const $=id=>document.getElementById(id);
+const ids=["price","machine","bag","grams","per","before"];
+let docRef=null,saveTimer=null;
+
+function money(n){return (n<0?"-":"")+"$"+Math.abs(n).toFixed(2)}
+function render(){
+  const n=s.before+s.count;
+  $("total").textContent=n;
+  const bg=s.bags.reduce((a,b)=>a+b.grams,0),bs=s.bags.reduce((a,b)=>a+b.price,0);
+  const ppg=bg>0?bs/bg:(s.grams>0?s.bag/s.grams:0);
+  const beans=ppg*s.per;
+  const mach=n>0?s.machine/n:0;
+  const cpc=beans+mach;
+  const spent=s.machine+(s.bags.length?bs:beans*n);
+  $("b-n").textContent=s.bags.length;
+  $("b-spent").textContent=s.bags.length?money(bs):"-";
+  $("b-left").textContent=s.bags.length?Math.max(0,Math.round(bg-s.count*s.per))+" g":"-";
+  const saved=s.price*n-spent;
+  $("r-cpc").textContent=n>0?money(cpc):"-";
+  $("r-beans").textContent=money(beans);
+  $("r-mach").textContent=n>0?money(mach):"-";
+  $("r-save").textContent=n>0?money(s.price-cpc):"-";
+  $("r-spent").textContent=money(spent);
+  $("r-saved").textContent=money(saved);
+  $("r-saved").className=saved<0?"neg":"pos";
+  const be=s.machine/(s.price-beans);
+  $("r-be").textContent=s.price-beans<=0?"No saving":s.machine<=0?"Paid off":Math.ceil(be)+" ("+Math.round(n/be*100)+"%)";
+}
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(async()=>{
+    try{ if(docRef) await docRef.set(s); }catch(e){}
+    try{ localStorage.setItem("coffee-state",JSON.stringify(s)); }catch(e){}
+  },300);
+}
+function load(o){ s={...defaults,...o}; s.bags=Array.isArray(s.bags)?[...s.bags]:[]; ids.forEach(k=>$(k).value=s[k]); render(); }
+
+ids.forEach(k=>$(k).addEventListener("input",e=>{
+  const v=parseFloat(e.target.value); s[k]=isNaN(v)?0:v; render(); save();
+}));
+$("add").addEventListener("click",()=>{s.count++;render();save();});
+$("undo").addEventListener("click",()=>{if(s.count>0){s.count--;render();save();}});
+
+$("bagbtn").addEventListener("click",()=>{s.bags.push({price:s.bag,grams:s.grams,t:Date.now()});render();save();});
+$("bagundo").addEventListener("click",()=>{if(s.bags.length){s.bags.pop();render();save();}});
+
+// start from local copy, then switch to saved copy when available
+try{ const l=localStorage.getItem("coffee-state"); load(l?JSON.parse(l):{}); }catch(e){ load({}); }
+
+$("note").textContent="Saved on this device in this browser.";
+</script>
+</body>
+</html>
